@@ -717,8 +717,8 @@ class Tag2TuneApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("Tag2Tune — Local Music to Spotify")
-        self.root.geometry("780x660")
-        self.root.minsize(720, 560)
+        self.root.geometry("1100x760")
+        self.root.minsize(940, 640)
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(5, weight=1)
 
@@ -740,6 +740,7 @@ class Tag2TuneApp:
         self.scan_summary_var = tk.StringVar(value="No scan performed yet.")
         self.current_task_var = tk.StringVar(value="Ready to start.")
         self.progress_detail_var = tk.StringVar(value="")
+        self.progress_percent_var = tk.StringVar(value="0%")
         self.update_existing_var = tk.BooleanVar(value=True)
         self.show_console_var = tk.BooleanVar(value=True)
         self.format_var = tk.StringVar(value="All Audio Formats")
@@ -751,255 +752,339 @@ class Tag2TuneApp:
         self.logger.log("Application started.")
 
     def _build_ui(self) -> None:
-        self.spotify_black = "#121212"
-        self.spotify_gray = "#181818"
-        self.spotify_green = "#1DB954"
+        self._configure_styles()
+        self._build_menu()
 
         self.root.configure(background=self.spotify_black)
-        style = ttk.Style(self.root)
-        try:
-            style.theme_use("clam")
-        except Exception:
-            pass
-        style.configure(".", background=self.spotify_black, foreground="white")
-        style.configure("TButton", background=self.spotify_gray, foreground="white", borderwidth=0, padding=6)
-        style.map(
-            "TButton",
-            background=[("active", self.spotify_green), ("disabled", self.spotify_gray)],
-            foreground=[("active", "white"), ("disabled", "grey")],
-        )
-        style.configure("TLabel", background=self.spotify_black, foreground="white", padding=4)
-        style.configure("TFrame", background=self.spotify_black)
-        style.configure("TCheckbutton", background=self.spotify_black, foreground="white", padding=4)
-        style.configure("TLabelframe", background=self.spotify_black, foreground="white")
-        style.configure("TLabelframe.Label", background=self.spotify_black, foreground="white")
-        style.configure("TProgressbar", thickness=16)
-        style.configure("Treeview", background=self.spotify_gray, fieldbackground=self.spotify_gray, foreground="white", bordercolor=self.spotify_black, lightcolor=self.spotify_black, darkcolor=self.spotify_black)
-        style.configure("Treeview.Heading", background=self.spotify_gray, foreground="white")
-        style.configure("Vertical.TScrollbar", background=self.spotify_gray, troughcolor=self.spotify_black)
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=0)
+        self.root.rowconfigure(1, weight=0)
+        self.root.rowconfigure(2, weight=0)
+        self.root.rowconfigure(3, weight=0)
+        self.root.rowconfigure(4, weight=0)
+        self.root.rowconfigure(5, weight=1)
+        self.root.rowconfigure(6, weight=0)
+
+        self._build_header()
+        self._build_dashboard()
+        self._build_toolbar()
+        self._build_main_content()
+        self._build_progress_card()
+        self._build_console()
+        self._build_statusbar()
+
+        self._refresh_sync_mode_ui()
+        sys.stdout = self
+
+    def _configure_styles(self) -> None:
+        self.spotify_black = "#121212"
+        self.spotify_gray = "#181818"
+        self.spotify_raised = "#1E1E1E"
+        self.spotify_border = "#2A2A2A"
+        self.spotify_entry = "#202020"
+        self.spotify_green = "#1DB954"
+        self.spotify_hover_green = "#28D864"
+        self.spotify_text = "#FFFFFF"
+        self.spotify_muted = "#B3B3B3"
+        self.spotify_disabled = "#666666"
+        self.spotify_danger = "#7A2E36"
+        self.spotify_danger_hover = "#9A3A44"
 
         self.root.option_add("*tearOff", False)
-        menu_bar = tk.Menu(self.root, background=self.spotify_black, foreground="white")
-        file_menu = tk.Menu(menu_bar, tearoff=0, background=self.spotify_black, foreground="white")
+        self.root.option_add("*Font", ("Segoe UI", 10))
+
+        self.style = ttk.Style(self.root)
+        try:
+            self.style.theme_use("clam")
+        except Exception:
+            pass
+
+        self.style.configure(".", background=self.spotify_black, foreground=self.spotify_text, font=("Segoe UI", 10))
+        self.style.configure("TFrame", background=self.spotify_black, borderwidth=0)
+        self.style.configure("Header.TFrame", background=self.spotify_black, borderwidth=0)
+        self.style.configure("Card.TFrame", background=self.spotify_gray, borderwidth=1, relief="solid")
+        self.style.configure("CardBody.TFrame", background=self.spotify_gray, borderwidth=0)
+        self.style.configure("Raised.Card.TFrame", background=self.spotify_raised, borderwidth=1, relief="solid")
+        self.style.configure("Status.TFrame", background=self.spotify_gray, borderwidth=1, relief="solid")
+        self.style.configure("Toolbar.TFrame", background=self.spotify_black, borderwidth=0)
+        self.style.configure("Statusbar.TFrame", background=self.spotify_black, borderwidth=0)
+
+        self.style.configure("TLabel", background=self.spotify_black, foreground=self.spotify_text, padding=0)
+        self.style.configure("Title.TLabel", background=self.spotify_black, foreground=self.spotify_text, font=("Segoe UI Semibold", 22))
+        self.style.configure("Subtitle.TLabel", background=self.spotify_black, foreground=self.spotify_muted, font=("Segoe UI", 10))
+        self.style.configure("Section.TLabel", background=self.spotify_gray, foreground=self.spotify_text, font=("Segoe UI Semibold", 13))
+        self.style.configure("RaisedSection.TLabel", background=self.spotify_raised, foreground=self.spotify_text, font=("Segoe UI Semibold", 13))
+        self.style.configure("CardTitle.TLabel", background=self.spotify_gray, foreground=self.spotify_muted, font=("Segoe UI Semibold", 10))
+        self.style.configure("CardValue.TLabel", background=self.spotify_gray, foreground=self.spotify_text, font=("Segoe UI Semibold", 13))
+        self.style.configure("CardMuted.TLabel", background=self.spotify_gray, foreground=self.spotify_muted, font=("Segoe UI", 9))
+        self.style.configure("Label.TLabel", background=self.spotify_gray, foreground=self.spotify_muted, font=("Segoe UI", 10))
+        self.style.configure("Status.TLabel", background=self.spotify_black, foreground=self.spotify_muted, font=("Segoe UI", 9))
+        self.style.configure("ProgressTitle.TLabel", background=self.spotify_gray, foreground=self.spotify_text, font=("Segoe UI Semibold", 13))
+        self.style.configure("ProgressDetail.TLabel", background=self.spotify_gray, foreground=self.spotify_muted, font=("Segoe UI", 10))
+        self.style.configure("ProgressPercent.TLabel", background=self.spotify_gray, foreground=self.spotify_green, font=("Segoe UI Semibold", 13))
+
+        self.style.configure("TButton", borderwidth=0, focusthickness=0, padding=(16, 10), font=("Segoe UI Semibold", 10))
+        self.style.configure("Primary.TButton", background=self.spotify_green, foreground="black")
+        self.style.map(
+            "Primary.TButton",
+            background=[("disabled", self.spotify_raised), ("pressed", "#169C46"), ("active", self.spotify_hover_green)],
+            foreground=[("disabled", self.spotify_disabled), ("pressed", "black"), ("active", "black")],
+        )
+        self.style.configure("Secondary.TButton", background=self.spotify_raised, foreground=self.spotify_text)
+        self.style.map(
+            "Secondary.TButton",
+            background=[("disabled", self.spotify_gray), ("pressed", "#2B2B2B"), ("active", "#333333")],
+            foreground=[("disabled", self.spotify_disabled), ("active", self.spotify_text)],
+        )
+        self.style.configure("Danger.TButton", background=self.spotify_danger, foreground=self.spotify_text)
+        self.style.map(
+            "Danger.TButton",
+            background=[("disabled", self.spotify_gray), ("pressed", "#61262D"), ("active", self.spotify_danger_hover)],
+            foreground=[("disabled", self.spotify_disabled), ("active", self.spotify_text)],
+        )
+        self.style.configure("Toolbar.TButton", background=self.spotify_raised, foreground=self.spotify_text, padding=(18, 14), font=("Segoe UI Semibold", 10))
+        self.style.map(
+            "Toolbar.TButton",
+            background=[("disabled", self.spotify_gray), ("pressed", "#2B2B2B"), ("active", "#333333")],
+            foreground=[("disabled", self.spotify_disabled), ("active", self.spotify_text)],
+        )
+
+        self.style.configure("TCheckbutton", background=self.spotify_gray, foreground=self.spotify_text, padding=(0, 6), font=("Segoe UI", 10))
+        self.style.map(
+            "TCheckbutton",
+            background=[("active", self.spotify_gray)],
+            foreground=[("disabled", self.spotify_disabled), ("active", self.spotify_text)],
+        )
+        self.style.configure("ConsoleToggle.TCheckbutton", background=self.spotify_gray, foreground=self.spotify_muted, padding=(0, 4), font=("Segoe UI Semibold", 9))
+        self.style.map("ConsoleToggle.TCheckbutton", background=[("active", self.spotify_gray)], foreground=[("active", self.spotify_text)])
+
+        self.style.configure("Modern.TEntry", fieldbackground=self.spotify_entry, background=self.spotify_entry, foreground=self.spotify_text, insertcolor=self.spotify_text, borderwidth=1, relief="flat", padding=(10, 8))
+        self.style.map(
+            "Modern.TEntry",
+            fieldbackground=[("readonly", self.spotify_entry), ("disabled", self.spotify_gray)],
+            foreground=[("readonly", self.spotify_text), ("disabled", self.spotify_disabled)],
+        )
+        self.style.configure("Modern.TCombobox", fieldbackground=self.spotify_entry, background=self.spotify_entry, foreground=self.spotify_text, arrowcolor=self.spotify_text, borderwidth=1, relief="flat", padding=(10, 8))
+        self.style.map(
+            "Modern.TCombobox",
+            fieldbackground=[("readonly", self.spotify_entry), ("disabled", self.spotify_gray)],
+            foreground=[("readonly", self.spotify_text), ("disabled", self.spotify_disabled)],
+            selectbackground=[("readonly", self.spotify_entry)],
+            selectforeground=[("readonly", self.spotify_text)],
+        )
+
+        self.style.configure("Modern.Horizontal.TProgressbar", troughcolor=self.spotify_entry, background=self.spotify_green, bordercolor=self.spotify_entry, lightcolor=self.spotify_green, darkcolor=self.spotify_green, thickness=24)
+        self.style.configure("Treeview", background=self.spotify_gray, fieldbackground=self.spotify_gray, foreground=self.spotify_text, bordercolor=self.spotify_black, lightcolor=self.spotify_black, darkcolor=self.spotify_black, rowheight=26)
+        self.style.configure("Treeview.Heading", background=self.spotify_raised, foreground=self.spotify_text, font=("Segoe UI Semibold", 10))
+        self.style.configure("Vertical.TScrollbar", background=self.spotify_gray, troughcolor=self.spotify_black, arrowcolor=self.spotify_text)
+
+    def _build_menu(self) -> None:
+        menu_bar = tk.Menu(self.root, background=self.spotify_black, foreground=self.spotify_text, activebackground=self.spotify_green, activeforeground="black")
+        file_menu = tk.Menu(menu_bar, tearoff=0, background=self.spotify_black, foreground=self.spotify_text, activebackground=self.spotify_green, activeforeground="black")
         file_menu.add_command(label="Generate Playlist Files", command=self.on_scan_clicked)
         file_menu.add_command(label="Import Playlists", command=self.on_sync_clicked)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit)
         menu_bar.add_cascade(label="File", menu=file_menu)
 
-        tools_menu = tk.Menu(menu_bar, tearoff=0, background=self.spotify_black, foreground="white")
+        tools_menu = tk.Menu(menu_bar, tearoff=0, background=self.spotify_black, foreground=self.spotify_text, activebackground=self.spotify_green, activeforeground="black")
         tools_menu.add_command(label="Spotify Settings", command=self.open_settings_window)
         tools_menu.add_command(label="Remove Duplicates from Playlist", command=self.on_remove_duplicates_clicked)
         tools_menu.add_command(label="Clear Cache", command=self._clear_cache)
         tools_menu.add_command(label="Open Log Folder", command=self.open_log_folder)
         menu_bar.add_cascade(label="Tools", menu=tools_menu)
 
-        help_menu = tk.Menu(menu_bar)
+        help_menu = tk.Menu(menu_bar, tearoff=0, background=self.spotify_black, foreground=self.spotify_text, activebackground=self.spotify_green, activeforeground="black")
         help_menu.add_command(label="About", command=self._show_about)
         menu_bar.add_cascade(label="Help", menu=help_menu)
         self.root.config(menu=menu_bar)
 
-        header_frame = ttk.Frame(self.root)
-        header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 12), padx=8)
+    def _build_header(self) -> None:
+        header_frame = ttk.Frame(self.root, style="Header.TFrame")
+        header_frame.grid(row=0, column=0, sticky="ew", padx=24, pady=(20, 18))
+        header_frame.columnconfigure(0, weight=1)
 
-        title_label = ttk.Label(
+        ttk.Label(header_frame, text="Tag2Tune", style="Title.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(
             header_frame,
-            text="Tag2Tune",
-            font=("Segoe UI", 16, "bold"),
-        )
-        title_label.grid(row=0, column=0, sticky="w")
+            text="Convert your local music library into Spotify playlists.",
+            style="Subtitle.TLabel",
+        ).grid(row=1, column=0, sticky="w", pady=(6, 14))
 
-        config_note = ttk.Label(
-            header_frame,
-            text="A clean Spotify-black interface for playlist generation and import.",
-            font=("Segoe UI", 10),
-        )
-        config_note.grid(row=1, column=0, sticky="w", pady=(4, 0))
+        rule = tk.Frame(header_frame, background=self.spotify_border, height=1, bd=0, highlightthickness=0)
+        rule.grid(row=2, column=0, sticky="ew")
 
-        toolbar_frame = ttk.Frame(self.root)
-        toolbar_frame.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 12))
-        toolbar_frame.columnconfigure((0, 1, 2), weight=1)
+    def _build_dashboard(self) -> None:
+        dashboard_frame = ttk.Frame(self.root, style="TFrame")
+        dashboard_frame.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 18))
+        dashboard_frame.columnconfigure((0, 1, 2), weight=1, uniform="dashboard")
 
-        ttk.Button(toolbar_frame, text="Generate Playlist Files", command=self.on_scan_clicked).grid(
-            row=0, column=0, sticky="ew", padx=(0, 8)
-        )
-        ttk.Button(toolbar_frame, text="Import into Spotify", command=self.on_sync_clicked).grid(
-            row=0, column=1, sticky="ew", padx=(0, 8)
-        )
-        ttk.Button(toolbar_frame, text="Open Logs", command=self.open_log_folder).grid(
-            row=0, column=2, sticky="ew"
-        )
+        self._build_dashboard_card(dashboard_frame, 0, "Spotify", self.spotify_status_var, "Authentication status")
+        self._build_dashboard_card(dashboard_frame, 1, "Cache", self.cache_status_var, "Spotify lookup cache")
+        self._build_dashboard_card(dashboard_frame, 2, "Library", self.scan_summary_var, "Selected music source")
 
-        dashboard_frame = ttk.Frame(self.root)
-        dashboard_frame.grid(row=2, column=0, sticky="ew", padx=8, pady=(0, 12))
-        dashboard_frame.columnconfigure(1, weight=1)
+    def _build_dashboard_card(self, parent: ttk.Frame, column: int, title: str, variable: tk.StringVar, subtitle: str) -> None:
+        card = ttk.Frame(parent, style="Card.TFrame", padding=(18, 14))
+        card.grid(row=0, column=column, sticky="nsew", padx=(0 if column == 0 else 8, 0 if column == 2 else 8))
+        card.columnconfigure(0, weight=1)
+        ttk.Label(card, text=title, style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(card, textvariable=variable, style="CardValue.TLabel", wraplength=280).grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        ttk.Label(card, text=subtitle, style="CardMuted.TLabel").grid(row=2, column=0, sticky="w", pady=(8, 0))
 
-        ttk.Label(dashboard_frame, text="Spotify Status:", font=("Segoe UI", 10, "bold")).grid(
-            row=0, column=0, sticky="w", pady=2
-        )
-        ttk.Label(dashboard_frame, textvariable=self.spotify_status_var, font=("Segoe UI", 10)).grid(
-            row=0, column=1, sticky="w", pady=2
-        )
-        ttk.Label(dashboard_frame, textvariable=self.cache_status_var, font=("Segoe UI", 10)).grid(
-            row=1, column=0, columnspan=2, sticky="w", pady=2
-        )
-        ttk.Label(dashboard_frame, textvariable=self.scan_summary_var, font=("Segoe UI", 10)).grid(
-            row=2, column=0, columnspan=2, sticky="w", pady=2
-        )
+    def _build_toolbar(self) -> None:
+        toolbar_frame = ttk.Frame(self.root, style="Toolbar.TFrame")
+        toolbar_frame.grid(row=2, column=0, sticky="ew", padx=24, pady=(0, 20))
+        toolbar_frame.columnconfigure((0, 1, 2, 3), weight=1, uniform="toolbar")
 
-        step_frame = ttk.Frame(self.root)
-        step_frame.grid(row=3, column=0, sticky="ew", padx=8, pady=(0, 12))
-        step_frame.columnconfigure(0, weight=1)
-        step_frame.columnconfigure(1, weight=1)
+        buttons = [
+            ("Generate Playlist", self.on_scan_clicked),
+            ("Import into Spotify", self.on_sync_clicked),
+            ("Open Logs", self.open_log_folder),
+            ("Settings", self.open_settings_window),
+        ]
+        for column, (text, command) in enumerate(buttons):
+            button = ttk.Button(toolbar_frame, text=text, command=command, style="Toolbar.TButton")
+            button.grid(row=0, column=column, sticky="ew", padx=(0 if column == 0 else 8, 0 if column == 3 else 8), ipady=2)
+            self._register_button_hover(button)
 
-        music_frame = ttk.LabelFrame(step_frame, text="STEP 1 — Select Music Library")
-        music_frame.grid(row=0, column=0, sticky="ew", padx=(0, 8), pady=(0, 0))
-        music_frame.columnconfigure(1, weight=1)
+    def _build_main_content(self) -> None:
+        content_frame = ttk.Frame(self.root, style="TFrame")
+        content_frame.grid(row=3, column=0, sticky="ew", padx=24, pady=(0, 20))
+        content_frame.columnconfigure(0, weight=1, uniform="content")
+        content_frame.columnconfigure(1, weight=1, uniform="content")
 
-        ttk.Label(music_frame, text="Music Folder:").grid(row=0, column=0, sticky="w", padx=8, pady=6)
-        self.music_folder_entry = ttk.Entry(
-            music_frame,
-            textvariable=self.music_folder_var,
-            state="readonly",
-            width=50,
-        )
-        self.music_folder_entry.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=6)
-        ttk.Button(music_frame, text="Browse...", command=self.on_browse_music_folder).grid(
-            row=0, column=2, sticky="e", padx=8, pady=6
-        )
+        self._build_music_card(content_frame)
+        self._build_import_card(content_frame)
 
-        ttk.Label(music_frame, text="Audio format filter:").grid(row=1, column=0, sticky="w", padx=8, pady=6)
-        self.format_dropdown = ttk.Combobox(
-            music_frame,
-            textvariable=self.format_var,
-            state="readonly",
-            values=list(SUPPORTED_EXTENSIONS.keys()),
-        )
-        self.format_dropdown.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=6)
-        self.generate_button = ttk.Button(
-            music_frame,
-            text="Generate Playlist Files",
-            command=self.on_scan_clicked,
-        )
-        self.generate_button.grid(row=2, column=0, columnspan=3, sticky="ew", padx=8, pady=(4, 8))
+    def _build_music_card(self, parent: ttk.Frame) -> None:
+        music_frame = ttk.Frame(parent, style="Card.TFrame", padding=(20, 18))
+        music_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        music_frame.columnconfigure(0, weight=1)
 
-        self.cancel_scan_button = ttk.Button(
-            music_frame,
-            text="Cancel Scan",
-            command=self.on_cancel_scan,
-            state="disabled",
-        )
-        self.cancel_scan_button.grid(row=3, column=0, columnspan=3, sticky="ew", padx=8, pady=(0, 8))
+        ttk.Label(music_frame, text="Music Library", style="Section.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(music_frame, text="Choose a folder and generate playlist text files.", style="CardMuted.TLabel").grid(row=1, column=0, sticky="w", pady=(4, 18))
 
-        sync_frame = ttk.LabelFrame(step_frame, text="STEP 2 — Spotify Import")
-        sync_frame.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=(0, 0))
-        sync_frame.columnconfigure(1, weight=1)
+        ttk.Label(music_frame, text="Music Folder", style="Label.TLabel").grid(row=2, column=0, sticky="w")
+        folder_row = ttk.Frame(music_frame, style="CardBody.TFrame")
+        folder_row.grid(row=3, column=0, sticky="ew", pady=(6, 16))
+        folder_row.columnconfigure(0, weight=1)
+        self.music_folder_entry = ttk.Entry(folder_row, textvariable=self.music_folder_var, state="readonly", style="Modern.TEntry")
+        self.music_folder_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+        browse_music_button = ttk.Button(folder_row, text="Browse", command=self.on_browse_music_folder, style="Secondary.TButton", width=12)
+        browse_music_button.grid(row=0, column=1, sticky="e")
+        self._register_button_hover(browse_music_button)
 
-        self.playlist_source_label = ttk.Label(sync_frame, text="Playlist Source:")
-        self.playlist_source_label.grid(row=0, column=0, sticky="w", padx=8, pady=6)
-        self.playlist_source_entry = ttk.Entry(
-            sync_frame,
-            textvariable=self.playlist_source_var,
-            state="readonly",
-            width=50,
-        )
-        self.playlist_source_entry.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=6)
-        self.browse_playlist_button = ttk.Button(
-            sync_frame,
-            text="Browse Folder...",
-            command=self.on_browse_playlist_source,
-        )
-        self.browse_playlist_button.grid(row=0, column=2, sticky="e", padx=8, pady=6)
+        ttk.Label(music_frame, text="Format", style="Label.TLabel").grid(row=4, column=0, sticky="w")
+        self.format_dropdown = ttk.Combobox(music_frame, textvariable=self.format_var, state="readonly", values=list(SUPPORTED_EXTENSIONS.keys()), style="Modern.TCombobox")
+        self.format_dropdown.grid(row=5, column=0, sticky="ew", pady=(6, 18))
 
-        ttk.Label(sync_frame, text="Source Type:").grid(row=1, column=0, sticky="w", padx=8, pady=6)
-        self.sync_mode_dropdown = ttk.Combobox(
-            sync_frame,
-            textvariable=self.sync_mode_var,
-            state="readonly",
-            values=["Playlist Folder", "Single Playlist File"],
-            width=22,
-        )
-        self.sync_mode_dropdown.grid(row=1, column=1, sticky="w", padx=(8, 0), pady=6)
+        action_row = ttk.Frame(music_frame, style="CardBody.TFrame")
+        action_row.grid(row=6, column=0, sticky="ew")
+        action_row.columnconfigure((0, 1), weight=1, uniform="music_actions")
+        self.generate_button = ttk.Button(action_row, text="Generate", command=self.on_scan_clicked, style="Primary.TButton")
+        self.generate_button.grid(row=0, column=0, sticky="ew", padx=(0, 8), ipady=2)
+        self.cancel_scan_button = ttk.Button(action_row, text="Cancel", command=self.on_cancel_scan, state="disabled", style="Danger.TButton")
+        self.cancel_scan_button.grid(row=0, column=1, sticky="ew", padx=(8, 0), ipady=2)
+        self._register_button_hover(self.generate_button)
+        self._register_button_hover(self.cancel_scan_button)
+
+    def _build_import_card(self, parent: ttk.Frame) -> None:
+        sync_frame = ttk.Frame(parent, style="Card.TFrame", padding=(20, 18))
+        sync_frame.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        sync_frame.columnconfigure(0, weight=1)
+
+        ttk.Label(sync_frame, text="Spotify Import", style="Section.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(sync_frame, text="Import generated playlist files into Spotify.", style="CardMuted.TLabel").grid(row=1, column=0, sticky="w", pady=(4, 18))
+
+        self.playlist_source_label = ttk.Label(sync_frame, text="Playlist Folder", style="Label.TLabel")
+        self.playlist_source_label.grid(row=2, column=0, sticky="w")
+        source_row = ttk.Frame(sync_frame, style="CardBody.TFrame")
+        source_row.grid(row=3, column=0, sticky="ew", pady=(6, 16))
+        source_row.columnconfigure(0, weight=1)
+        self.playlist_source_entry = ttk.Entry(source_row, textvariable=self.playlist_source_var, state="readonly", style="Modern.TEntry")
+        self.playlist_source_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+        self.browse_playlist_button = ttk.Button(source_row, text="Browse", command=self.on_browse_playlist_source, style="Secondary.TButton", width=12)
+        self.browse_playlist_button.grid(row=0, column=1, sticky="e")
+        self._register_button_hover(self.browse_playlist_button)
+
+        mode_row = ttk.Frame(sync_frame, style="CardBody.TFrame")
+        mode_row.grid(row=4, column=0, sticky="ew", pady=(0, 16))
+        mode_row.columnconfigure(0, weight=1)
+        mode_row.columnconfigure(1, weight=1)
+        ttk.Label(mode_row, text="Import Mode", style="Label.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(mode_row, text="Existing Playlists", style="Label.TLabel").grid(row=0, column=1, sticky="w", padx=(16, 0))
+        self.sync_mode_dropdown = ttk.Combobox(mode_row, textvariable=self.sync_mode_var, state="readonly", values=["Playlist Folder", "Single Playlist File"], style="Modern.TCombobox")
+        self.sync_mode_dropdown.grid(row=1, column=0, sticky="ew", pady=(6, 0), padx=(0, 8))
         self.sync_mode_dropdown.bind("<<ComboboxSelected>>", lambda event: self._refresh_sync_mode_ui())
+        self.update_existing_checkbox = ttk.Checkbutton(mode_row, text="Update Existing", variable=self.update_existing_var)
+        self.update_existing_checkbox.grid(row=1, column=1, sticky="w", padx=(16, 0), pady=(6, 0))
 
-        self.update_existing_checkbox = ttk.Checkbutton(
-            sync_frame,
-            text="Update Existing Playlists",
-            variable=self.update_existing_var,
-        )
-        self.update_existing_checkbox.grid(row=2, column=0, columnspan=3, sticky="w", padx=8, pady=6)
+        action_row = ttk.Frame(sync_frame, style="CardBody.TFrame")
+        action_row.grid(row=5, column=0, sticky="ew", pady=(2, 0))
+        action_row.columnconfigure((0, 1), weight=1, uniform="sync_actions")
+        self.sync_button = ttk.Button(action_row, text="Import", command=self.on_sync_clicked, style="Primary.TButton")
+        self.sync_button.grid(row=0, column=0, sticky="ew", padx=(0, 8), ipady=2)
+        self.cancel_sync_button = ttk.Button(action_row, text="Cancel", command=self.on_cancel_sync, state="disabled", style="Danger.TButton")
+        self.cancel_sync_button.grid(row=0, column=1, sticky="ew", padx=(8, 0), ipady=2)
+        self._register_button_hover(self.sync_button)
+        self._register_button_hover(self.cancel_sync_button)
 
-        self.sync_button = ttk.Button(
-            sync_frame,
-            text="Import Into Spotify",
-            command=self.on_sync_clicked,
-        )
-        self.sync_button.grid(row=3, column=0, columnspan=3, sticky="ew", padx=8, pady=(4, 8))
-
-        self.cancel_sync_button = ttk.Button(
-            sync_frame,
-            text="Cancel Sync",
-            command=self.on_cancel_sync,
-            state="disabled",
-        )
-        self.cancel_sync_button.grid(row=4, column=0, columnspan=3, sticky="ew", padx=8, pady=(0, 8))
-
-        progress_frame = ttk.LabelFrame(self.root, text="Progress")
-        progress_frame.grid(row=4, column=0, sticky="ew", padx=8, pady=(0, 12))
+    def _build_progress_card(self) -> None:
+        progress_frame = ttk.Frame(self.root, style="Status.TFrame", padding=(20, 16))
+        progress_frame.grid(row=4, column=0, sticky="ew", padx=24, pady=(0, 20))
         progress_frame.columnconfigure(0, weight=1)
+        progress_frame.columnconfigure(1, weight=0)
 
-        self.current_task_label = ttk.Label(
-            progress_frame,
-            textvariable=self.current_task_var,
-            font=("Segoe UI", 10, "bold"),
-        )
-        self.current_task_label.grid(row=0, column=0, sticky="w", padx=8, pady=(8, 4))
+        self.current_task_label = ttk.Label(progress_frame, textvariable=self.current_task_var, style="ProgressTitle.TLabel")
+        self.current_task_label.grid(row=0, column=0, sticky="w")
+        self.progress_percent_label = ttk.Label(progress_frame, textvariable=self.progress_percent_var, style="ProgressPercent.TLabel")
+        self.progress_percent_label.grid(row=0, column=1, sticky="e", padx=(18, 0))
 
-        self.progress_detail_label = ttk.Label(
-            progress_frame,
-            textvariable=self.progress_detail_var,
-            font=("Segoe UI", 10),
-        )
-        self.progress_detail_label.grid(row=1, column=0, sticky="w", padx=8, pady=(0, 6))
+        self.progress_bar = ttk.Progressbar(progress_frame, mode="determinate", style="Modern.Horizontal.TProgressbar")
+        self.progress_bar.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(12, 8))
 
-        self.progress_bar = ttk.Progressbar(progress_frame, mode="determinate")
-        self.progress_bar.grid(row=2, column=0, sticky="ew", padx=8, pady=(0, 8))
+        self.progress_detail_label = ttk.Label(progress_frame, textvariable=self.progress_detail_var, style="ProgressDetail.TLabel")
+        self.progress_detail_label.grid(row=2, column=0, sticky="w")
 
-        self.console_toggle = ttk.Checkbutton(
-            progress_frame,
-            text="Hide Console",
-            variable=self.show_console_var,
-            command=self.toggle_console,
-        )
-        self.console_toggle.grid(row=3, column=0, sticky="w", padx=8, pady=(0, 8))
+        self.console_toggle = ttk.Checkbutton(progress_frame, text="Hide Activity Log", variable=self.show_console_var, command=self.toggle_console, style="ConsoleToggle.TCheckbutton")
+        self.console_toggle.grid(row=2, column=1, sticky="e")
 
-        self.console_frame = ttk.LabelFrame(self.root, text="Activity Console")
-        self.console_frame.grid(row=5, column=0, sticky="nsew", padx=8, pady=(0, 8))
+    def _build_console(self) -> None:
+        self.console_frame = ttk.Frame(self.root, style="Raised.Card.TFrame", padding=(14, 12))
+        self.console_frame.grid(row=5, column=0, sticky="nsew", padx=24, pady=(0, 16))
         self.console_frame_grid_info = self.console_frame.grid_info()
         self.console_frame.columnconfigure(0, weight=1)
-        self.console_frame.rowconfigure(0, weight=1)
+        self.console_frame.rowconfigure(1, weight=1)
 
+        ttk.Label(self.console_frame, text="Activity Log", style="RaisedSection.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 10))
         self.log_area = scrolledtext.ScrolledText(
             self.console_frame,
             wrap=tk.WORD,
-            bg="#2b2b2b",
-            fg="#f0f0f0",
-            insertbackground="#ffffff",
+            bg="#0D0D0D",
+            fg="#E8E8E8",
+            insertbackground="#FFFFFF",
+            selectbackground=self.spotify_green,
+            selectforeground="black",
+            relief="flat",
+            borderwidth=0,
+            padx=12,
+            pady=10,
             font=("Consolas", 10),
         )
-        self.log_area.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        self.log_area.grid(row=1, column=0, sticky="nsew")
         self.log_area.configure(state="disabled")
 
-        status_frame = ttk.Frame(self.root)
-        status_frame.grid(row=6, column=0, sticky="ew", pady=(0, 0), padx=8)
+    def _build_statusbar(self) -> None:
+        status_frame = ttk.Frame(self.root, style="Statusbar.TFrame")
+        status_frame.grid(row=6, column=0, sticky="ew", padx=24, pady=(0, 12))
         status_frame.columnconfigure(0, weight=1)
+        self.status_label = ttk.Label(status_frame, text="Ready", style="Status.TLabel")
+        self.status_label.grid(row=0, column=0, sticky="w")
 
-        self.status_label = ttk.Label(status_frame, text="Ready")
-        self.status_label.grid(row=0, column=0, sticky="w", padx=8, pady=(0, 8))
-
-        self._refresh_sync_mode_ui()
-        sys.stdout = self
-
+    def _register_button_hover(self, button: ttk.Button) -> None:
+        button.configure(cursor="hand2")
+        button.bind("<Enter>", lambda event: button.state(["active"]), add="+")
+        button.bind("<Leave>", lambda event: button.state(["!active"]), add="+")
     def write(self, message: str) -> None:
         if message:
             self.log_queue.put(message)
@@ -1111,6 +1196,8 @@ class Tag2TuneApp:
                 self.progress_detail_var.set(
                     f"{value} / {maximum} tracks" if maximum else ""
                 )
+                percent = int((value / maximum) * 100) if maximum else 0
+                self.progress_percent_var.set(f"{percent}%")
             elif task[0] == "update_summary":
                 _, text = task
                 self.scan_summary_var.set(text)
@@ -1137,7 +1224,7 @@ class Tag2TuneApp:
         self.spotify_status_var.set(
             "🟢 Connected" if self.config_manager.is_valid() else "🔴 Not Configured"
         )
-        self.cache_status_var.set(f"Cache Entries: {len(self.cache.mapping)}")
+        self.cache_status_var.set(f"{len(self.cache.mapping)} Cached Tracks")
         self.scan_summary_var.set(
             f"Selected library: {self.music_folder_var.get() or 'None'}"
         )
@@ -1221,10 +1308,10 @@ class Tag2TuneApp:
             self.console_frame.grid(
                 **self.console_frame_grid_info,
             )
-            self.console_toggle.config(text="Hide Console")
+            self.console_toggle.config(text="Hide Activity Log")
         else:
             self.console_frame.grid_remove()
-            self.console_toggle.config(text="Show Console")
+            self.console_toggle.config(text="Show Activity Log")
         self.root.update_idletasks()
 
     def on_scan_clicked(self) -> None:
@@ -1481,6 +1568,7 @@ class Tag2TuneApp:
             self.progress_bar.config(maximum=100, value=0)
             self.current_task_var.set("Scanning music folders...")
             self.progress_detail_var.set("0 / 0 files")
+            self.progress_percent_var.set("0%")
             self.status_label.config(text="Scanning...")
         else:
             self.generate_button.state(["!disabled"])
@@ -1488,6 +1576,7 @@ class Tag2TuneApp:
             self.progress_bar.config(value=0)
             self.current_task_var.set("Ready")
             self.progress_detail_var.set("")
+            self.progress_percent_var.set("0%")
             self.status_label.config(text="Ready")
 
     def _prepare_sync_ui(self, running: bool) -> None:
@@ -1495,6 +1584,7 @@ class Tag2TuneApp:
             self.sync_button.state(["disabled"])
             self.cancel_sync_button.state(["!disabled"])
             self.progress_bar.config(maximum=100, value=0)
+            self.progress_percent_var.set("0%")
             self.current_task_var.set("Preparing Spotify sync...")
             self.progress_detail_var.set("")
             self.status_label.config(text="Synchronizing...")
@@ -1504,6 +1594,7 @@ class Tag2TuneApp:
             self.progress_bar.config(value=0)
             self.current_task_var.set("Ready")
             self.progress_detail_var.set("")
+            self.progress_percent_var.set("0%")
             self.status_label.config(text="Ready")
 
     def open_settings_window(self) -> None:
