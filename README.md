@@ -65,7 +65,7 @@ pip install spotipy mutagen
 pip install ttkbootstrap
 ```
 
----
+````
 
 ## 🔑 Spotify API Configuration
 
